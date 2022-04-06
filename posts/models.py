@@ -17,6 +17,9 @@ class Tweet(models.Model):
     def __str__(self):
         return self.text
 
+    class Meta:
+        ordering = ['-created_at']
+
 
 class Like(models.Model):
     tweet = models.ForeignKey('Tweet',

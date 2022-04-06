@@ -10,29 +10,41 @@ class LikeSerializer(serializers.ModelSerializer):
 
 
 class CommentSerializer(serializers.ModelSerializer):
-    owner = serializers.ReadOnlyField(source='owner.username')
+    # owner = serializers.HyperlinkedRelatedField(read_only=True, many=False, view_name='user-detail')
+    owner = serializers.SlugRelatedField(many=False, read_only=True, slug_field='username')
+
+    comments = serializers.HyperlinkedIdentityField(view_name='api:comment-list')
 
     class Meta:
+        # fields = ('id', 'text', 'owner', 'is_public', 'likes_count', 'comments_count', 'comments', 'parent',
+        #           'created_at', 'modified_at')
         model = Comment
-        fields = ('id', 'text', 'owner', 'is_public', 'likes_count', 'comments_count', 'comments', 'parent',
-                  'created_at', 'modified_at')
 
-    def get_fields(self):
-        fields = super(CommentSerializer, self).get_fields()
-        fields['comments'] = CommentSerializer(many=True, read_only=True)
+        fields = ('id', 'text', 'owner', 'likes_count',
+                  'comments_count', 'comments', 'parent', 'created_at', 'modified_at')
 
-        return fields
+    # def get_fields(self):
+    #     fields = super(CommentSerializer, self).get_fields()
+    #     fields['comments'] = CommentSerializer(many=True, read_only=True)
+    #
+    #     return fields
 
 
 class TweetSerializer(serializers.ModelSerializer):
-    owner = serializers.ReadOnlyField(source='owner.username')
-    comments = CommentSerializer(many=True, read_only=True)
+    # owner = serializers.HyperlinkedRelatedField(read_only=True, many=False, view_name='user-detail')
+    owner = serializers.SlugRelatedField(many=False, read_only=True, slug_field='username')
+    comments = serializers.HyperlinkedIdentityField(view_name='api:comment-list')
 
     class Meta:
         model = Tweet
-        fields = ('id', 'text', 'owner', 'is_public', 'type', 'likes_count', 'comments_count', 'comments', 'created_at',
-                  'modified_at')
+        fields = ('id', 'text', 'owner', 'likes_count', 'comments_count', 'comments',
+                  'created_at', 'modified_at')
         read_only_fields = ('created_at', 'modified_at')
+
+        # extra_kwargs = {
+        #     'email': {'write_only': True},
+        #     'password': {'write_only': True},
+        # }
 
 
 # class TweetCreateSerializer(serializers.ModelSerializer):

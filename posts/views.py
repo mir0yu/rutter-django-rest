@@ -9,7 +9,9 @@ from posts.serializers import LikeSerializer, CommentSerializer
 from posts.utils import override_view_attributes
 from posts.serializers import TweetSerializer
 
+
 # from posts.serializers import TweetCreateSerializer
+from posts.permissions import IsOwnerOrReadOnly
 
 
 class CreateDeleteLikeView(generics.CreateAPIView):
@@ -61,6 +63,8 @@ class CreateCommentView(generics.CreateAPIView):
 class ListTweetView(generics.ListCreateAPIView):
     queryset = Tweet.objects.all()
     serializer_class = TweetSerializer
+    # ordering_fields = ['created_at']
+    # order = ['created_at']
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -117,6 +121,37 @@ class ListPublicTweetsView(generics.ListAPIView):
         return Response(serializer.data)
 
 
+class ListCommentsView(generics.ListAPIView):
+    queryset = Comment.objects.filter()
+    serializer_class = CommentSerializer
+
+    def list(self, request, *args, **kwargs):
+        parent_id = int(self.kwargs.get('pk'))
+
+        queryset = self.filter_queryset(self.queryset)
+        queryset = queryset.filter(Q(parent=parent_id))
+
+        if queryset.count() < 1:
+            raise NotFound("Comments not found.")
+
+        for comment in queryset:
+            tweet_id = comment.parent.id
+            likes_count = Like.objects.filter(tweet=tweet_id).count()
+
+            comment.likes_count = likes_count
+            comment.comments_count = comment.comments.all().count()
+            comment.save()
+
+        page = self.paginate_queryset(queryset)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
 class ListUpdateDeleteCommentView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
@@ -140,9 +175,35 @@ class ListUpdateDeleteCommentView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ListUpdateDeleteTweetView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Tweet.objects.all()
+    queryset = Comment.objects.all()
     serializer_class = TweetSerializer
+    permission_classes = [IsOwnerOrReadOnly & IsAuthenticated]
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        override_view_attributes(self)
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        parent_id = int(self.kwargs.get('pk'))
+
+        queryset = self.filter_queryset(self.queryset)
+        queryset = queryset.filter(Q(parent=parent_id))
+
+        if queryset.count() < 1:
+            raise NotFound("Tweet not found.")
+
+        tweet_id = instance.id
+        likes_count = Like.objects.filter(tweet=tweet_id).count()
+        instance.likes_count = likes_count
+        instance.comments_count = instance.comments.all().count()
+        instance.save()
+
+        page = self.paginate_queryset(queryset)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=False)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(instance, many=False)
+        return Response(serializer.data)
+
+    # def __init__(self, **kwargs):
+    #     super().__init__(**kwargs)
+    #     override_view_attributes(self)
